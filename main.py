@@ -74,7 +74,7 @@ async def on_member_join(member):
         
         try:
             response = groq_client.chat.completions.create(
-                model="llama3-70b-8192",
+                model="llama-3.3-70b-versatile",
                 messages=[
                     {"role": "system", "content": NOTSBOTS_PERSONALITY},
                     {"role": "user", "content": prompt}
@@ -98,7 +98,7 @@ async def chat_nots(ctx, *, mensaje):
         try:
             # Llamar a la API de Groq
             response = groq_client.chat.completions.create(
-                model="llama3-70b-8192",  # Modelo potente y gratuito
+                model="llama-3.3-70b-versatile",  # Modelo potente y gratuito
                 messages=[
                     {"role": "system", "content": NOTSBOTS_PERSONALITY},
                     {"role": "user", "content": f"El usuario {ctx.author.name} dice: {mensaje}"}
@@ -212,7 +212,7 @@ async def analizar(ctx, *, descripcion_partida):
             prompt = f"Analiza esta situación de partida como un caster profesional arrogante: '{descripcion_partida}'. Da tu 'experto' opinión sobre qué hizo mal el jugador y qué debería haber hecho. Máximo 3 oraciones."
             
             response = groq_client.chat.completions.create(
-                model="llama3-70b-8192",
+                model="llama-3.3-70b-versatile",
                 messages=[
                     {"role": "system", "content": NOTSBOTS_PERSONALITY},
                     {"role": "user", "content": prompt}
