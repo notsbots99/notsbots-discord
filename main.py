@@ -6,17 +6,41 @@ import groq
 import random
 import asyncio
 from datetime import datetime
+import threading
+
+# Importar Flask para el health check de Railway
+from flask import Flask
 
 # Cargar variables de entorno
 load_dotenv()
 
-# Configuración de intents (permisos del bot)
+# ========== SERVIDOR WEB PARA HEALTH CHECK (RAILWAY) ==========
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "✅ Notsbot's está online y dominando noobs!"
+
+@app.route('/health')
+def health():
+    return {"status": "ok", "bot": "Notsbot's", "timestamp": datetime.now().isoformat()}
+
+def run_web_server():
+    """Ejecutar el servidor web en un hilo separado"""
+    port = int(os.getenv('PORT', 8080))
+    app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
+
+# Iniciar el servidor web en segundo plano
+web_thread = threading.Thread(target=run_web_server, daemon=True)
+web_thread.start()
+print("🌐 Servidor web de health check iniciado en puerto", os.getenv('PORT', 8080))
+
+# ========== CONFIGURACIÓN DEL BOT DE DISCORD ==========
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
 intents.presences = True
 
-# Crear el bot con prefijo "!"
 bot = commands.Bot(command_prefix='!', intents=intents, help_command=None)
 
 # Inicializar cliente de Groq
@@ -55,7 +79,6 @@ async def on_ready():
     print(f'🤖 ID del bot: {bot.user.id}')
     print(f'🎮 Conectado a {len(bot.guilds)} servidor(es)')
     
-    # Cambiar estado del bot
     await bot.change_presence(
         activity=discord.Activity(
             type=discord.ActivityType.playing, 
@@ -69,10 +92,9 @@ async def on_ready():
 async def on_member_join(member):
     channel = member.guild.system_channel
     if channel is not None:
-        # Usar el LLM para generar bienvenida personalizada
-        prompt = f"Genera un mensaje de bienvenida sarcástico pero divertido para {member.name} que acaba de unirse al servidor gaming. Menciona que se prepare para shooters y que aquí no se aceptan camperos."
-        
         try:
+            prompt = f"Genera un mensaje de bienvenida sarcástico pero divertido para {member.name} que acaba de unirse al servidor gaming. Menciona que se prepare para shooters y que aquí no se aceptan camperos."
+            
             response = groq_client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=[
@@ -85,7 +107,6 @@ async def on_member_join(member):
             mensaje = response.choices[0].message.content
             await channel.send(mensaje)
         except Exception as e:
-            # Fallback si falla el LLM
             await channel.send(f"¿Otro nuevo? Bueno {member.mention}, bienvenido. Espero que apuntes mejor que el resto de estos mancos... o al menos que seas bueno para traer snacks. 🎮")
 
 # Comando: Chat inteligente con Notsbot's
@@ -93,12 +114,10 @@ async def on_member_join(member):
 async def chat_nots(ctx, *, mensaje):
     """Habla con Notsbot's usando IA"""
     
-    # Indicar que el bot está escribiendo
     async with ctx.typing():
         try:
-            # Llamar a la API de Groq
             response = groq_client.chat.completions.create(
-                model="llama-3.3-70b-versatile",  # Modelo potente y gratuito
+                model="llama-3.3-70b-versatile",
                 messages=[
                     {"role": "system", "content": NOTSBOTS_PERSONALITY},
                     {"role": "user", "content": f"El usuario {ctx.author.name} dice: {mensaje}"}
@@ -125,7 +144,7 @@ async def insultar(ctx, miembro: discord.Member = None):
             prompt = f"Genera un insulto creativo, gracioso y gamer para {miembro.name}. Que sea sobre su habilidad en shooters (o falta de ella). Máximo 2 oraciones."
             
             response = groq_client.chat.completions.create(
-                model="llama3-8b-8192",  # Modelo más rápido para respuestas cortas
+                model="llama-3.1-8b-instant",
                 messages=[
                     {"role": "system", "content": NOTSBOTS_PERSONALITY},
                     {"role": "user", "content": prompt}
@@ -138,7 +157,6 @@ async def insultar(ctx, miembro: discord.Member = None):
             await ctx.send(f"**{miembro.mention}** {insulto}")
             
         except Exception as e:
-            # Fallbacks predefinidos si falla el LLM
             insultos_fallback = [
                 f"{miembro.mention} tu puntería es tan mala que los Stormtroopers te darían lecciones.",
                 f"{miembro.mention} he visto bots de relleno jugar mejor que tú... y eso dice mucho.",
@@ -159,7 +177,7 @@ async def motivar(ctx, miembro: discord.Member = None):
             prompt = f"Genera un mensaje motivador pero con arrogancia y sarcasmo para {miembro.name} que está jugando mal o desmotivado. Debe sonar como 'levántate que puedes hacerlo' pero dicho por alguien que cree ser mejor que él."
             
             response = groq_client.chat.completions.create(
-                model="llama3-8b-8192",
+                model="llama-3.1-8b-instant",
                 messages=[
                     {"role": "system", "content": NOTSBOTS_PERSONALITY},
                     {"role": "user", "content": prompt}
@@ -188,7 +206,7 @@ async def roastme(ctx):
             prompt = f"Genera un roast creativo y gracioso para {ctx.author.name} que pidió ser humillado. Que sea sobre gamers, shooters o su dedicación al juego."
             
             response = groq_client.chat.completions.create(
-                model="llama3-8b-8192",
+                model="llama-3.1-8b-instant",
                 messages=[
                     {"role": "system", "content": NOTSBOTS_PERSONALITY},
                     {"role": "user", "content": prompt}
@@ -234,7 +252,7 @@ async def help_command(ctx):
     embed = discord.Embed(
         title="🎮 NOTSBOT'S - COMANDOS",
         description="El bot más arrogante y competitivo de Discord. Usa estos comandos:",
-        color=0xff0000  # Rojo
+        color=0xff0000
     )
     
     embed.add_field(
@@ -282,7 +300,6 @@ if __name__ == "__main__":
     token = os.getenv('DISCORD_TOKEN')
     if not token:
         print("❌ ERROR: No se encontró DISCORD_TOKEN en el archivo .env")
-        print("Asegúrate de crear el archivo .env con tu token de Discord")
     else:
         print("🚀 Iniciando Notsbot's...")
         bot.run(token)
